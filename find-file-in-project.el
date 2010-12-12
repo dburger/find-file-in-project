@@ -98,7 +98,40 @@ Use this to exclude portions of your project: \"-not -regex \\\".*vendor.*\\\"\"
 (defvar ffip-project-file ".git"
   "What file should ffip look for to define a project?")
 
+(defvar ffip-try-tags nil
+  "If non-nil, ffip will first look for a TAGS file to determine project files.")
+
 (defun ffip-project-files ()
+  "Returns a list of all files in the project.
+
+First looks for a TAGS file and if found uses it to determine
+the project files, otherwise, GNU find is used."
+  (let ((tags-dir
+         (and ffip-try-tags
+              (ffip-locate-dominating-file default-directory "TAGS"))))
+    (if tags-dir
+        (ffip-project-files-from-tags tags-dir)
+      (ffip-project-files-from-find))))
+
+(defun ffip-project-files-from-tags (tags-dir)
+  "Returns a list of all files in the TAGS file in TAGS-DIR"
+  (save-excursion
+    (visit-tags-table tags-dir)
+    (visit-tags-table-buffer)
+    (tags-table-files)))
+
+(defun ffip-project-files-from-find ()
+  "Returns a list of all files in the project using GNU find."
+  (interactive)
+  (split-string (shell-command-to-string
+                 (format "find %s -type f %s %s"
+                         (or ffip-project-root
+                             (ffip-project-root)
+                             (error "no project root found"))
+                         (ffip-join-patterns)
+                         ffip-find-options))))
+
+(defun ffip-project-files-alist ()
   "Return an alist of all filenames in the project and their path.
 
 Files with duplicate filenames are suffixed with the name of the
@@ -112,13 +145,7 @@ directory they are found in so that they are unique."
                   (ffip-uniqueify file-cons))
                 (add-to-list 'file-alist file-cons)
                 file-cons))
-            (split-string (shell-command-to-string
-                           (format "find %s -type f %s %s"
-                                   (or ffip-project-root
-                                       (ffip-project-root)
-                                       (error "no project root found"))
-                                   (ffip-join-patterns)
-                                   ffip-find-options))))))
+            (ffip-project-files))))
 
 ;; TODO: Emacs has some built-in uniqueify functions; investigate using those.
 (defun ffip-uniqueify (file-cons)
@@ -140,7 +167,7 @@ The project's scope is defined as the first directory containing
 an `.emacs-project' file. You can override this by locally
 setting the `ffip-project-root' variable."
   (interactive)
-  (let* ((project-files (ffip-project-files))
+  (let* ((project-files (ffip-project-files-alist))
          (file (if (and (boundp 'ido-mode) ido-mode)
                    (ido-completing-read "Find file in project: "
                                         (mapcar 'car project-files))
