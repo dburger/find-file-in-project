@@ -34,7 +34,7 @@
 ;; This library depends on GNU find.
 
 ;; This file provides a couple methods for quickly finding any file in
-;; a given project. Projects are defined in two ways. The first uses 
+;; a given project. Projects are defined in two ways. The first uses
 ;; `locate-dominating-file'. First, if the `locate-dominating-file'
 ;; function is bound, it assumes you are using Emacs 23, in which case
 ;; you it will look for a `.dir-locals.el' file in an ancestor
@@ -50,11 +50,12 @@
 ;; manually require it in your Emacs configuration to make use of it.
 
 ;; By default, it looks only for files whose names match
-;; `ffip-regexp', but it's understood that that variable will be
+;; `ffip-patterns', but it's understood that that variable will be
 ;; overridden locally. This can be done either with a mode hook:
 
 ;; (add-hook 'emacs-lisp-mode-hook
-;;           (lambda (set (make-local-variable 'ffip-regexp) ".*\\.el")))
+;;           (lambda (set (make-local-variable 'ffip-patterns)
+;;                        '("*.rb" "*.html" "*.el" "*.js" "*.rhtml"))))
 
 ;; or by setting it in your .emacs-project/.dir-settings.el file, in
 ;; which case it will get set locally.
@@ -157,7 +158,6 @@ project-local-variables.el."
          (if (featurep 'project) (project-root)
            ;; TODO: provide a list of files that can be fallen back upon
            (ffip-locate-dominating-file default-directory ffip-project-file))))
-           
     (or project-root
         (progn (message "No project was defined for the current file.")
                nil))))
