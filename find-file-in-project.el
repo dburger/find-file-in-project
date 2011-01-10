@@ -118,6 +118,14 @@ Use this to exclude portions of your project: \"-not -regex \\\".*vendor.*\\\"\"
 (defvar ffip-try-tags nil
   "If non-nil, ffip will first look for a TAGS file to determine project files.")
 
+(defvar ffip-use-project-cache t
+  "Whether or not to cache the project files between invocations.
+
+When non-nil the method of determining project files will be used once
+and on subsequent invocations the candidate project files will come
+from the cache.  When nil the method of determining project files,
+TAGS files or GNU find, will be used on each invocation.")
+
 (defvar ffip-project-cache (make-hash-table :test 'equal)
   "Cache of project root to files in that project.
 
@@ -140,7 +148,8 @@ list of files for the project, which is then cached and returned."
   (let ((project-root
          (or (ffip-project-root)
              (error "No project root found"))))
-    (or (gethash project-root ffip-project-cache)
+    (or (and ffip-use-project-cache
+             (gethash project-root ffip-project-cache))
         (puthash project-root
                  (if (file-exists-p (concat project-root "TAGS"))
                      (ffip-project-files-from-tags project-root)
