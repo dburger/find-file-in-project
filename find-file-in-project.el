@@ -172,21 +172,20 @@ list of files for the project, which is then cached and returned."
                          (ffip-join-patterns)
                          ffip-find-options))))
 
-(defun ffip-project-files-alist ()
-  "Return an alist of all filenames in the project and their path.
+(defun ffip-project-files-map ()
+  "Return an map from the filenames in the project to their paths.
 
-Files with duplicate filenames are suffixed with the name of the
-directory they are found in so that they are unique."
-  (let ((file-alist nil))
-    (mapcar (lambda (file)
-              (let ((file-cons (cons (file-name-nondirectory file)
-                                     (expand-file-name file))))
-                (when (assoc (car file-cons) file-alist)
-                  (ffip-uniqueify (assoc (car file-cons) file-alist))
-                  (ffip-uniqueify file-cons))
-                (add-to-list 'file-alist file-cons)
-                file-cons))
-            (ffip-project-files))))
+The paths are stored in a list to handle the case of multiple files
+with the same filename."
+  (let ((file-map (make-hash-table :test 'equal)))
+    (mapc (lambda (file)
+            (let ((file-name (file-name-nondirectory file))
+                  file-paths)
+              (setq file-paths (or (gethash file-name file-map) (list)))
+              (push file file-paths)
+              (puthash file-name file-paths file-map)))
+            (ffip-project-files))
+    file-map))
 
 ;; TODO: Emacs has some built-in uniqueify functions; investigate using those.
 (defun ffip-uniqueify (file-cons)
@@ -208,13 +207,28 @@ The project's scope is defined as the first directory containing
 an `.emacs-project' file. You can override this by locally
 setting the `ffip-project-root' variable."
   (interactive)
-  (let* ((project-files (ffip-project-files-alist))
-         (file (if (and (boundp 'ido-mode) ido-mode)
-                   (ido-completing-read "Find file in project: "
-                                        (mapcar 'car project-files))
-                 (completing-read "Find file in project: "
-                                  (mapcar 'car project-files)))))
-    (find-file (cdr (assoc file project-files)))))
+  (let* ((project-files-map (ffip-project-files-map))
+         (project-file-names (ffip-map-keys project-files-map))
+         (file-name (ffip-completing-read "Find file in project: " project-file-names))
+         (file-paths (gethash file-name project-files-map))
+         (file-path (if (> (length file-paths) 1)
+                        (ffip-completing-read "Disambiguate: " file-paths)
+                      (car file-paths))))
+    (find-file file-path)))
+
+(defun ffip-map-keys (map)
+  "Return a list of all the keys in MAP."
+  (let (keys)
+    (maphash (lambda (k v) (push k keys)) map)
+    keys))
+
+(defun ffip-completing-read (prompt names)
+  "Perform a completing read over NAMES prompted by PROMPT.
+
+ido is used for the completing read if available."
+  (if (and (boundp 'ido-mode) ido-mode)
+      (ido-completing-read prompt names nil t)
+    (completing-read prompt names nil t)))
 
 (defun ffip-project-root ()
   "Return the root of the project.
